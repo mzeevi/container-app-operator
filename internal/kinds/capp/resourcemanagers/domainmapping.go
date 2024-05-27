@@ -28,7 +28,6 @@ const (
 	eventCappDomainMappingCreationFailed = "DomainMappingCreationFailed"
 	eventCappDomainMappingCreated        = "DomainMappingCreated"
 	CappResourceKey                      = "rcs.dana.io/parent-capp"
-	eventCappSecretNotFound              = "SecretNotFound"
 	referenceKind                        = "Service"
 )
 
@@ -40,16 +39,13 @@ type KnativeDomainMappingManager struct {
 }
 
 // PrepareKnativeDomainMapping creates a new DomainMapping for a Knative service.
-func (k KnativeDomainMappingManager) prepareResource(capp cappv1alpha1.Capp) (knativev1beta1.DomainMapping, error) {
+func (k KnativeDomainMappingManager) prepareResource(capp cappv1alpha1.Capp) knativev1beta1.DomainMapping {
 	knativeDomainMapping := &knativev1beta1.DomainMapping{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      capp.Spec.RouteSpec.Hostname,
 			Namespace: capp.Namespace,
 			Labels: map[string]string{
-				CappResourceKey: capp.Name,
-			},
-			Annotations: map[string]string{
 				CappResourceKey: capp.Name,
 			},
 		},
@@ -61,37 +57,14 @@ func (k KnativeDomainMappingManager) prepareResource(capp cappv1alpha1.Capp) (kn
 			},
 		},
 	}
-	resourceManager := rclient.ResourceManagerClient{Ctx: k.Ctx, K8sclient: k.K8sclient, Log: k.Log}
 
 	if tlsEnabled := capp.Spec.RouteSpec.TlsEnabled; tlsEnabled {
-		if err := k.setHTTPSKnativeDomainMapping(capp, knativeDomainMapping, resourceManager); err != nil {
-			if !errors.IsNotFound(err) {
-				return *knativeDomainMapping, err
-			}
+		knativeDomainMapping.Spec.TLS = &knativev1beta1.SecretTLS{
+			SecretName: capp.Spec.RouteSpec.TlsSecret,
 		}
 	}
 
-	return *knativeDomainMapping, nil
-}
-
-// setHTTPSKnativeDomainMapping sets the DomainMapping TLS based on Capp.
-func (k KnativeDomainMappingManager) setHTTPSKnativeDomainMapping(capp cappv1alpha1.Capp, knativeDomainMapping *knativev1beta1.DomainMapping, resourceManager rclient.ResourceManagerClient) error {
-	tlsSecret := corev1.Secret{}
-
-	if err := resourceManager.K8sclient.Get(resourceManager.Ctx, types.NamespacedName{Name: capp.Spec.RouteSpec.TlsSecret, Namespace: capp.Namespace}, &tlsSecret); err != nil {
-		if errors.IsNotFound(err) {
-			k.EventRecorder.Event(&capp, corev1.EventTypeWarning, eventCappSecretNotFound,
-				fmt.Sprintf("TlsSecret %s for DomainMapping %s does not exist", capp.Spec.RouteSpec.TlsSecret, knativeDomainMapping.Name))
-			return fmt.Errorf("tlsSecret %s for DomainMapping does not exist: %w", capp.Spec.RouteSpec.TlsSecret, err)
-		}
-		return fmt.Errorf("failed to get TlsSecret %s for DomainMapping: %w", capp.Spec.RouteSpec.TlsSecret, err)
-	}
-
-	knativeDomainMapping.Spec.TLS = &knativev1beta1.SecretTLS{
-		SecretName: capp.Spec.RouteSpec.TlsSecret,
-	}
-
-	return nil
+	return *knativeDomainMapping
 }
 
 // CleanUp attempts to delete the associated DomainMapping for a given Capp resource.
@@ -110,7 +83,7 @@ func (k KnativeDomainMappingManager) CleanUp(capp cappv1alpha1.Capp) error {
 	return nil
 }
 
-// IsRequired is responsible to determine if resource knative domain mapping is required.
+// IsRequired is responsible to determine if resource DomainMapping is required.
 func (k KnativeDomainMappingManager) IsRequired(capp cappv1alpha1.Capp) bool {
 	return capp.Spec.RouteSpec.Hostname != ""
 }
@@ -127,11 +100,7 @@ func (k KnativeDomainMappingManager) Manage(capp cappv1alpha1.Capp) error {
 
 // createOrUpdate creates or updates a DomainMapping resource.
 func (k KnativeDomainMappingManager) createOrUpdate(capp cappv1alpha1.Capp) error {
-	domainMappingFromCapp, err := k.prepareResource(capp)
-	if err != nil {
-		return fmt.Errorf("failed to prepare DomainMapping resource: %w", err)
-	}
-
+	domainMappingFromCapp := k.prepareResource(capp)
 	domainMapping := knativev1beta1.DomainMapping{}
 	resourceManager := rclient.ResourceManagerClient{Ctx: k.Ctx, K8sclient: k.K8sclient, Log: k.Log}
 
@@ -150,7 +119,7 @@ func (k KnativeDomainMappingManager) createOrUpdate(capp cappv1alpha1.Capp) erro
 	return k.updateDomainMapping(domainMapping, domainMappingFromCapp, resourceManager)
 }
 
-// createKSVC creates a new DomainMapping and emits an event.
+// createDomainMapping creates a new DomainMapping and emits an event.
 func (k KnativeDomainMappingManager) createDomainMapping(capp cappv1alpha1.Capp, domainMappingFromCapp knativev1beta1.DomainMapping, resourceManager rclient.ResourceManagerClient) error {
 	if err := resourceManager.CreateResource(&domainMappingFromCapp); err != nil {
 		k.EventRecorder.Event(&capp, corev1.EventTypeWarning, eventCappDomainMappingCreationFailed,
@@ -159,7 +128,7 @@ func (k KnativeDomainMappingManager) createDomainMapping(capp cappv1alpha1.Capp,
 		return err
 	}
 
-	k.EventRecorder.Event(&capp, corev1.EventTypeWarning, eventCappDomainMappingCreated,
+	k.EventRecorder.Event(&capp, corev1.EventTypeNormal, eventCappDomainMappingCreated,
 		fmt.Sprintf("Created DomainMapping %s", domainMappingFromCapp.Name))
 
 	return nil

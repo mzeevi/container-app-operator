@@ -40,6 +40,17 @@ rules:
   - list
   - watch
 - apiGroups:
+  - cert.dana.io
+  resources:
+  - certificates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
   - events.k8s.io
   resources:
   - events
@@ -48,6 +59,17 @@ rules:
   - get
   - list
   - patch
+  - update
+  - watch
+- apiGroups:
+  - externaldns.k8s.io
+  resources:
+  - dnsendpoints
+  verbs:
+  - create
+  - delete
+  - get
+  - list
   - update
   - watch
 - apiGroups:

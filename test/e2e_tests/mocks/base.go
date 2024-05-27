@@ -43,7 +43,7 @@ func CreateBaseCapp() *cappv1alpha1.Capp {
 											Value: "capp-default-test",
 										},
 									},
-									Image:     "ghcr.io/knative/autoscale-go:latest",
+									Image:     "ghcr.io/dana-team/capp-gin-app:v0.2.0",
 									Name:      "capp-default-test",
 									Resources: corev1.ResourceRequirements{},
 								},

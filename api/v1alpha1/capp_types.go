@@ -17,12 +17,14 @@ limitations under the License.
 package v1alpha1
 
 import (
+	certv1alpha1 "github.com/dana-team/certificate-operator/api/v1alpha1"
 	nfspvcv1alpha1 "github.com/dana-team/nfspvc-operator/api/v1alpha1"
 	loggingv1beta1 "github.com/kube-logging/logging-operator/pkg/sdk/logging/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	knativev1 "knative.dev/serving/pkg/apis/serving/v1"
 	knativev1beta1 "knative.dev/serving/pkg/apis/serving/v1beta1"
+	dnsv1alpha1 "sigs.k8s.io/external-dns/endpoint"
 )
 
 // CappSpec defines the desired state of Capp.
@@ -182,6 +184,14 @@ type RouteStatus struct {
 	// DomainMappingObjectStatus is the status of the underlying DomainMapping object
 	// +optional
 	DomainMappingObjectStatus knativev1beta1.DomainMappingStatus `json:"domainMappingObjectStatus,omitempty"`
+
+	// DNSEndpointObjectStatus is the status of the underlying DNSEndpoint object
+	// +optional
+	DNSEndpointObjectStatus dnsv1alpha1.DNSEndpointStatus `json:"dnsEndpointObjectStatus,omitempty"`
+
+	// CertificateObjectStatus is the status of the underlying Certificate object
+	// +optional
+	CertificateObjectStatus certv1alpha1.CertificateStatus `json:"certificateObjectStatus,omitempty"`
 }
 
 // VolumesStatus shows the state of the Volumes objects linked to the Capp.

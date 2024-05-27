@@ -158,17 +158,21 @@ build/install.yaml: manifests kustomize
 
 ##@ Capp prerequisites
 CERT_MANAGER_VERSION ?= v1.13.3
-CERT_MANAGER_URL ?= https://github.com/cert-manager/cert-manager/releases/download/$(CERT_MANAGER_VERSION)/cert-manager.yaml
-NFSPVC_URL ?= https://raw.githubusercontent.com/dana-team/nfspvc-operator/main/all_in_one.yaml
+NFSPVC_VERSION ?= v0.3.0
+CERTIFICATE_OPERATOR_VERSION ?= v0.1.0
 
-.PHONY: prereq
-prereq: install install-cert-manager install-knative install-helm install-logging install-nfspvc enable-nfs-knative ## Install every prerequisite needed to develop on container-app-operator.
+CERT_MANAGER_URL ?= https://github.com/cert-manager/cert-manager/releases/download/$(CERT_MANAGER_VERSION)/cert-manager.yaml
+NFSPVC_URL ?= https://github.com/dana-team/nfspvc-operator/releases/download/$(NFSPVC_VERSION)/install.yaml
+CERTIFICATE_OPERATOR_URL ?= https://github.com/dana-team/certificate-operator/releases/download/$(CERTIFICATE_OPERATOR_VERSION)/install.yaml
+
+.PHONY: prereq ## Install every prerequisite needed to develop and run the operator.
+prereq: install install-cert-manager install-knative install-helm install-logging install-nfspvc enable-nfs-knative install-external-dns install-certificate-operator
 
 .PHONY: install-nfspvc
-install-nfspvc: ## Install NfsPvcOperator
+install-nfspvc: ## Install nfspvc-operator on the cluster
 	kubectl apply -f $(NFSPVC_URL)
 
-.PHONY: install-cert-manager
+.PHONY: install-cert-manager ## Install cert-manager on the cluster
 install-cert-manager:
 	kubectl apply -f $(CERT_MANAGER_URL)
 
@@ -177,9 +181,20 @@ enable-nfs-knative: ## Enable NFS for Knative
 	kubectl patch configmap config-features -n knative-serving -p '{"data":{"kubernetes.podspec-persistent-volume-claim":"enabled", "kubernetes.podspec-persistent-volume-write":"enabled"}}'
 
 .PHONY: install-logging
-install-logging: ## Install logging operator on the kind cluster
+install-logging: ## Install logging-operator on the cluster
 	helm upgrade --install --wait --create-namespace --namespace logging-operator-system logging-operator oci://ghcr.io/kube-logging/helm-charts/logging-operator
 	kubectl apply -f hack/logging-operator-resources.yaml
+
+.PHONY: install-external-dns
+install-external-dns: ## Install external-dns on the cluster
+	helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
+	helm repo update
+	helm upgrade --install --wait --create-namespace --namespace external-dns-system external-dns external-dns/external-dns --set sources={crd}
+	kubectl apply -f hack/external-dns-resources.yaml
+
+.PHONY: install-certificate-operator
+install-certificate-operator:  ## Install certificate-operator on the cluster
+	kubectl apply -f $(CERTIFICATE_OPERATOR_URL)
 
 KNATIVE_URL ?= https://github.com/knative-extensions/kn-plugin-quickstart/releases/download/knative-v1.11.2/kn-quickstart-linux-amd64
 KNATIVE_HPA_URL ?= https://github.com/knative/serving/releases/download/knative-v1.11.2/serving-hpa.yaml
